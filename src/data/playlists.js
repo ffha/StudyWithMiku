@@ -7,13 +7,6 @@ export const recommendPlaylists = [
     tags: ['神秘','有Miku','by 酸']
   },
   {
-    name: '东方精选集',
-    desc: '♦',
-    platform: 'netease',
-    playlistId: '8891884744',
-    tags: ['东方！','by 酸']
-  },
-  {
     name: '【学习向】Galgame纯音乐',
     desc: '静听一首gal曲子，品剧中故事。',
     platform: 'netease',
@@ -54,6 +47,13 @@ export const recommendPlaylists = [
     platform: 'netease',
     playlistId: '5438089118',
     tags: []
+  },
+  {
+    name: '东方精选集',
+    desc: '♦',
+    platform: 'netease',
+    playlistId: '8891884744',
+    tags: ['东方！','by 酸']
   },
 ]
 
