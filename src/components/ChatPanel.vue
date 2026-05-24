@@ -194,10 +194,13 @@ const getAvatarUrl = (message) => {
   if (profile && typeof profile.avatar_url === 'string' && profile.avatar_url) {
     return profile.avatar_url
   }
-  return ''
+  return '/favicon.svg'//如果没有头像，返回Miku做默认头像
 }
 
-const hasAvatarImage = (message) => !!getAvatarUrl(message)
+const hasAvatarImage = (message) => {
+  if (!message.userId) return false
+  return !avatarLoadFailures.has(`user:${message.userId}`)
+}
 
 const onAvatarLoadError = (failureKey) => {
   if (failureKey) avatarLoadFailures.add(failureKey)
