@@ -96,14 +96,10 @@
       <button
         class="action-btn chat-send-btn"
         type="submit"
-        :disabled="!isConnected || !isLoggedIn || !isAuthenticated || !chatInput.trim()"
-      >发送</button>
+        :disabled="isLoggedIn && (!isAuthenticated || !chatInput.trim())"
+      >{{ isLoggedIn ? '发送' : '登录' }}</button>
     </form>
-    <div v-if="!isLoggedIn" class="chat-login-tip">
-      <span>登录 MikuMod 账号后可以参与聊天</span>
-      <button class="action-btn login-btn" @click="$emit('login')">登录</button>
-    </div>
-    <div v-else-if="!isAuthenticated" class="chat-login-tip">
+    <div v-if="isLoggedIn && !isAuthenticated" class="chat-login-tip">
       <span>正在验证聊天身份...</span>
     </div>
   </div>
@@ -131,7 +127,7 @@ const props = defineProps({
   loadMore: { type: Function, default: null },
 })
 
-defineEmits(['login', 'popout'])
+const emit = defineEmits(['login', 'popout'])
 
 const SCROLL_STORAGE_KEY = 'study_chat_scroll_position'
 const SCROLL_BOTTOM_THRESHOLD = 60
@@ -299,6 +295,10 @@ const restoreScrollPosition = async () => {
 }
 
 const submit = () => {
+  if (!isLoggedIn) {
+    emit('login')
+    return
+  }
   const content = chatInput.value.trim()
   if (!content) return
   if (props.sendMessage(content)) {
@@ -675,13 +675,6 @@ defineExpose({ scrollChatToBottom, jumpToBottom })
   border-color: rgba(57, 197, 187, 0.5);
 }
 .chat-send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-.login-btn {
-  background: rgba(57, 197, 187, 0.3);
-  border-color: rgba(57, 197, 187, 0.5);
-  width: auto;
-  padding: 0.5rem 1.5rem;
-}
-.login-btn:disabled { opacity: 0.6; cursor: not-allowed; }
 .chat-login-tip {
   display: flex;
   justify-content: space-between;
@@ -700,8 +693,7 @@ defineExpose({ scrollChatToBottom, jumpToBottom })
   .chat-header { flex-direction: column; align-items: flex-start; gap: 0.75rem; }
   .chat-header-actions { align-self: flex-end; }
   .chat-messages-wrapper { min-height: 220px; max-height: 38vh; }
-  .chat-form { flex-direction: column; align-items: stretch; }
-  .chat-send-btn { width: 100%; }
+  .chat-send-btn { flex-shrink: 0; }
   .chat-login-tip { flex-direction: column; align-items: stretch; }
 }
 </style>

@@ -101,8 +101,8 @@ defineEmits(['close', 'login', 'ui-enter', 'ui-leave'])
 const STORAGE_KEY = 'study_floating_chat_layout'
 const MIN_WIDTH = 300
 const MIN_HEIGHT = 380
-const DEFAULT_WIDTH = 380
-const DEFAULT_HEIGHT = 560
+const DEFAULT_WIDTH = MIN_WIDTH
+const DEFAULT_HEIGHT = MIN_HEIGHT
 const MARGIN = 12
 
 const containerRef = ref(null)
@@ -140,8 +140,8 @@ const loadLayout = () => {
           Number(parsed.height) || DEFAULT_HEIGHT
         )
         const pos = clampPosition(
-          Number.isFinite(parsed.x) ? parsed.x : window.innerWidth - size.width - MARGIN * 2,
-          Number.isFinite(parsed.y) ? parsed.y : window.innerHeight - size.height - MARGIN * 6,
+          Number.isFinite(parsed.x) ? parsed.x : window.innerWidth - size.width - MARGIN,
+          Number.isFinite(parsed.y) ? parsed.y : window.innerHeight - size.height - MARGIN,
           size.width,
           size.height
         )
@@ -153,8 +153,8 @@ const loadLayout = () => {
   }
   const size = clampSize(DEFAULT_WIDTH, DEFAULT_HEIGHT)
   const pos = clampPosition(
-    window.innerWidth - size.width - MARGIN * 2,
-    window.innerHeight - size.height - MARGIN * 6,
+    window.innerWidth - size.width - MARGIN,
+    window.innerHeight - size.height - MARGIN,
     size.width,
     size.height
   )
