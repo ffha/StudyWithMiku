@@ -178,11 +178,35 @@ const getArtworkType = (src) => {
   return 'image/jpeg'
 }
 
+const getAbsoluteUrl = (relativeUrl) => {
+  if (!relativeUrl) return ''
+  if (relativeUrl.startsWith('http://') || relativeUrl.startsWith('https://')) {
+    return relativeUrl
+  }
+  try {
+    return new URL(relativeUrl, window.location.origin).href
+  } catch (e) {
+    return relativeUrl
+  }
+}
+
 const updateMediaSessionMetadata = () => {
   if (!('mediaSession' in navigator) || !('MediaMetadata' in window)) return
   const audio = getCurrentAudio()
   if (!audio) return
-  const artwork = audio.cover ? [{ src: audio.cover, sizes: '512x512', type: getArtworkType(audio.cover) }] : []
+  
+  const artwork = []
+  if (audio.cover) {
+    const absoluteCoverUrl = getAbsoluteUrl(audio.cover)
+    const artworkType = getArtworkType(absoluteCoverUrl)
+    artwork.push(
+      { src: absoluteCoverUrl, sizes: '96x96', type: artworkType },
+      { src: absoluteCoverUrl, sizes: '128x128', type: artworkType },
+      { src: absoluteCoverUrl, sizes: '256x256', type: artworkType },
+      { src: absoluteCoverUrl, sizes: '512x512', type: artworkType }
+    )
+  }
+  
   navigator.mediaSession.metadata = new MediaMetadata({
     title: audio.name || 'Study With Miku',
     artist: audio.artist || 'Miku',
