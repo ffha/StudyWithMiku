@@ -318,6 +318,8 @@ export const useCrossfade = () => {
     ap.on('pause', () => {
       if (isHandingOff) return
       if (isCrossfading) {
+        const a = ap.audio
+        if (a.ended || (Number.isFinite(a.duration) && a.duration - a.currentTime < 0.5)) return
         cleanup(ap, onMediaSessionSync)
         return
       }
