@@ -4,10 +4,10 @@ export const updates = [
     content: [
       '离高考还剩几十天了！',
       '希望大家都能考到自己希望的好成绩＞﹏＜',
-      '我把权威本人叫来了，被Miku祝福的人都能多考50分！',
+      'Miku会一直等着你的！',
     ],
     images:[
-      '/QuanWeiMiku.jpg'
+      '/update/miku1.jpeg',
     ]
     },
     {
