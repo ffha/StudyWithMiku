@@ -41,11 +41,29 @@ const COUNTRIES = {
   MM: '缅甸', KH: '柬埔寨', LA: '老挝', NP: '尼泊尔', MN: '蒙古',
   IR: '伊朗', IQ: '伊拉克', GE: '格鲁吉亚', AZ: '阿塞拜疆',
   CN: '中国',
+  HK: '中国香港', MO: '中国澳门',
 }
 
 const resolveLocation = (countryCode, regionName, countryName) => {
   if (!countryCode) return null
   const cc = String(countryCode).toUpperCase()
+  if (cc === 'HK' || cc === 'MO') {
+    if (regionName) {
+      const rn = String(regionName).trim()
+      if (CN_REGIONS[rn]) return CN_REGIONS[rn]
+      if (/[\u4e00-\u9fa5]/.test(rn)) return rn
+    }
+    return COUNTRIES[cc] || countryName || cc
+  }
+  if (cc === 'TW') {
+    if (regionName) {
+      const rn = String(regionName).trim()
+      if (CN_REGIONS[rn]) return CN_REGIONS[rn]
+      if (/[\u4e00-\u9fa5]/.test(rn)) return rn
+    }
+    return '中国台湾'
+  }
+
   if (cc === 'CN') {
     if (regionName) {
       const rn = String(regionName).trim()
@@ -66,14 +84,14 @@ const API_LIST = [
     if (!res.ok) return null
     const d = await res.json()
     if (d.status !== 'success') return null
-    return d.countryCode === 'CN' ? (d.regionName || '中国') : (d.country || null)
+    return resolveLocation(d.countryCode, d.regionName, d.country)
   },
   async () => {
-    const res = await fetch('https://ipwhois.app/json/?lang=zh-CN')
+    const res = await fetch('https://ipwhois.app/json/')
     if (!res.ok) return null
     const d = await res.json()
     if (d.success === false) return null
-    return d.country_code === 'CN' ? (d.region || '中国') : (d.country || null)
+    return resolveLocation(d.country_code, d.region, d.country)
   },
   async () => {
     const res = await fetch('https://api.ip.sb/geoip')
@@ -110,11 +128,11 @@ const API_LIST = [
     return resolveLocation(d.country_code, d.region_name, d.country_name)
   },
   async () => {
-    const res = await fetch('https://api.ipgeolocation.io/ipgeo?lang=zh-CN')
+    const res = await fetch('https://api.ipgeolocation.io/ipgeo')
     if (!res.ok) return null
     const d = await res.json()
     if (d.message) return null
-    return d.country_code2 === 'CN' ? (d.state_prov || '中国') : (d.country_name || null)
+    return resolveLocation(d.country_code2, d.state_prov, d.country_name)
   },
   async () => {
     const res = await fetch('https://freeipapi.com/api/json')
@@ -145,17 +163,24 @@ export function useGeoLocation() {
       }
     } catch {}
 
+    let fallback = ''
     for (const api of API_LIST) {
       try {
         const result = await api()
-        if (result) {
+        if (result && result !== '中国') {
           location.value = result
           try { sessionStorage.setItem(CACHE_KEY, JSON.stringify({ v: result, ts: Date.now() })) } catch {}
           return result
         }
+        if (result === '中国' && !fallback) fallback = '中国'
       } catch {}
     }
 
+    if (fallback) {
+      location.value = fallback
+      try { sessionStorage.setItem(CACHE_KEY, JSON.stringify({ v: fallback, ts: Date.now() })) } catch {}
+      return fallback
+    }
     return ''
   }
 
