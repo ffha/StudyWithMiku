@@ -34,8 +34,12 @@ export const quotesList = [
   { text: '天高地迥，觉宇宙之无穷；兴尽悲来，识盈虚之有数', source: '王勃' },//by 某科学的超电磁炮
   { text: '神不足惧，死不足忧，祸苦易忍，福乐易求', source: '伊壁鸠鲁' },//by 某科学的超电磁炮
   { text: '纵使希望渺茫，仍有点点星光', source: '洛星希' },//by 洛星希
-  { text: '永不假设，永不强求，顺其自然', source: '愧安乌桃' },//by 愧安乌桃
-  
+  { text: '永不假设,永不强求，顺其自然', source: '愧安乌桃' },//by 愧安乌桃
+  { text: '因为有愧,所以披星戴月.因为有梦,所以奋不顾身', source: '狐十一狸' },//by 狐十一狸
+  { text: '清蒙远眺云归处,淅雨入眼钟不闻', source: 'Embers' },//by Embers
+  { text: '漆夜流动着月,穿过胸膛,衔去了褐,带来了污垢与清冷', source: 'Embers' },//by Embers
+  { text: '纯黑的背景里,燃着火焰.在无尽中,逝成着余温', source: 'Embers' },//by Embers
+
   { text: '与其临渊羡鱼，不如退而结网', source: '《汉书》' },
   { text: '学习是唯一一件，投入越多回报越确定的事情', source: '' },
   { text: '在这个浮躁的世界里，沉下心来学习吧', source: '' },

@@ -49,18 +49,18 @@ export const recommendPlaylists = [
     tags: ['温柔','空灵','By 洛星希']
   },
   {
+    name: '看书刷题纯音乐',
+    desc: '',
+    platform: 'netease',
+    playlistId: '18010565030',
+    tags: ['低BPM','纯音乐','By 狐十一狸']
+  },
+  {
     name: '酸の心',
-    desc: '♦',
+    desc: '┭┮﹏┭┮',
     platform: 'netease',
     playlistId: '5438089118',
     tags: []
-  },
-  {
-    name: '东方精选集',
-    desc: '♦',
-    platform: 'netease',
-    playlistId: '8891884744',
-    tags: ['东方！','by 酸']
   },
 ]
 
