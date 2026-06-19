@@ -184,6 +184,7 @@ const props = defineProps({
 const emit = defineEmits(['login', 'popout'])
 
 const SCROLL_STORAGE_KEY = 'study_chat_scroll_position'
+const SEEN_MESSAGE_KEY = 'study_chat_last_seen_id'
 const SCROLL_BOTTOM_THRESHOLD = 60
 const SCROLL_SAVE_DEBOUNCE = 300
 
@@ -199,6 +200,7 @@ const chatMessagesRef = ref(null)
 const autoScrollPending = ref(true)
 const isReady = ref(false)
 const unreadCount = ref(0)
+const lastSeenMessageId = ref('')
 const avatarLoadFailures = reactive(new Set())
 const showStickerPanel = ref(false)
 
@@ -309,6 +311,9 @@ const jumpToBottom = () => {
   if (!el) return
   el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
   autoScrollPending.value = true
+  const msgs = props.messages
+  lastSeenMessageId.value = msgs.length ? msgs[msgs.length - 1].id : ''
+  try { localStorage.setItem(SEEN_MESSAGE_KEY, lastSeenMessageId.value) } catch {}
   unreadCount.value = 0
 }
 
@@ -322,7 +327,7 @@ const saveScrollPosition = () => {
     } else {
       localStorage.setItem(
         SCROLL_STORAGE_KEY,
-        JSON.stringify({ scrollTop: el.scrollTop, savedAt: Date.now() })
+        JSON.stringify({ scrollTop: el.scrollTop, lastSeenId: lastSeenMessageId.value, savedAt: Date.now() })
       )
     }
   } catch {}
@@ -338,6 +343,36 @@ const triggerLoadMore = () => {
 
 let previousScrollTop = Infinity
 
+const getLastVisibleMessageId = () => {
+  const el = chatMessagesRef.value
+  if (!el) return ''
+  const containerRect = el.getBoundingClientRect()
+  const items = el.querySelectorAll('[data-mid]')
+  let lastId = ''
+  for (const item of items) {
+    const rect = item.getBoundingClientRect()
+    if (rect.bottom > containerRect.top && rect.top < containerRect.bottom) {
+      lastId = item.dataset.mid
+    }
+  }
+  return lastId
+}
+
+const updateUnreadFromViewport = () => {
+  const lastId = getLastVisibleMessageId()
+  if (lastId) {
+    lastSeenMessageId.value = lastId
+    try { localStorage.setItem(SEEN_MESSAGE_KEY, lastId) } catch {}
+  }
+  const msgs = props.messages
+  if (!msgs.length) {
+    unreadCount.value = 0
+    return
+  }
+  const idx = msgs.findIndex(m => m.id === lastSeenMessageId.value)
+  unreadCount.value = idx === -1 ? 0 : Math.max(0, msgs.length - 1 - idx)
+}
+
 const handleScroll = () => {
   if (!isReady.value) return
   const el = chatMessagesRef.value
@@ -345,7 +380,7 @@ const handleScroll = () => {
   const currentScrollTop = el.scrollTop
   const atBottom = isAtBottom()
   autoScrollPending.value = atBottom
-  if (atBottom) unreadCount.value = 0
+  updateUnreadFromViewport()
   if (scrollSaveTimer) clearTimeout(scrollSaveTimer)
   scrollSaveTimer = setTimeout(saveScrollPosition, SCROLL_SAVE_DEBOUNCE)
   if (
@@ -367,20 +402,39 @@ const restoreScrollPosition = async () => {
     return
   }
   try {
+    const seenId = localStorage.getItem(SEEN_MESSAGE_KEY)
+    if (seenId) lastSeenMessageId.value = seenId
+  } catch {}
+  try {
     const raw = localStorage.getItem(SCROLL_STORAGE_KEY)
     if (raw) {
       const saved = JSON.parse(raw)
       if (saved && Number.isFinite(saved.scrollTop)) {
+        if (saved.lastSeenId) lastSeenMessageId.value = saved.lastSeenId
         const maxScroll = Math.max(0, el.scrollHeight - el.clientHeight)
         el.scrollTop = Math.min(Math.max(0, saved.scrollTop), maxScroll)
         autoScrollPending.value = isAtBottom()
+        updateUnreadFromViewport()
         isReady.value = true
         return
       }
     }
   } catch {}
+  if (lastSeenMessageId.value) {
+    const targetEl = el.querySelector(`[data-mid="${CSS.escape(lastSeenMessageId.value)}"]`)
+    if (targetEl) {
+      targetEl.scrollIntoView({ block: 'center' })
+      autoScrollPending.value = false
+      updateUnreadFromViewport()
+      isReady.value = true
+      return
+    }
+  }
   el.scrollTop = el.scrollHeight
   autoScrollPending.value = true
+  const msgs = props.messages
+  lastSeenMessageId.value = msgs.length ? msgs[msgs.length - 1].id : ''
+  unreadCount.value = 0
   isReady.value = true
 }
 
@@ -394,6 +448,9 @@ const submit = () => {
   if (props.sendMessage(content, geoLocation.value)) {
     chatInput.value = ''
     autoScrollPending.value = true
+    const msgs = props.messages
+    lastSeenMessageId.value = msgs.length ? msgs[msgs.length - 1].id : ''
+    try { localStorage.setItem(SEEN_MESSAGE_KEY, lastSeenMessageId.value) } catch {}
     unreadCount.value = 0
     scrollChatToBottom()
   }
@@ -417,6 +474,9 @@ const sendSticker = (id) => {
   if (!payload) return
   if (props.sendMessage(payload, geoLocation.value)) {
     autoScrollPending.value = true
+    const msgs = props.messages
+    lastSeenMessageId.value = msgs.length ? msgs[msgs.length - 1].id : ''
+    try { localStorage.setItem(SEEN_MESSAGE_KEY, lastSeenMessageId.value) } catch {}
     unreadCount.value = 0
     scrollChatToBottom()
   }
@@ -488,9 +548,11 @@ watch(
         scrollAnchor = null
       } else if (autoScrollPending.value) {
         if (el) el.scrollTop = el.scrollHeight
+        lastSeenMessageId.value = newList[newList.length - 1]?.id || ''
+        try { localStorage.setItem(SEEN_MESSAGE_KEY, lastSeenMessageId.value) } catch {}
         unreadCount.value = 0
       } else if (newLen > oldLen && !olderPrepended) {
-        unreadCount.value += newLen - oldLen
+        updateUnreadFromViewport()
       }
       lastOldestId = newOldestId
     })
@@ -769,9 +831,11 @@ defineExpose({ scrollChatToBottom, jumpToBottom })
 }
 .chat-jump-to-bottom:hover { background: rgba(57, 197, 187, 1); transform: translateY(-1px); }
 .chat-jump-badge {
-  font-size: 0.7rem;
-  font-weight: 600;
+  font-size: 0.75rem;
+  font-weight: 700;
   line-height: 1;
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei UI', 'Hiragino Sans GB', 'Noto Sans SC', sans-serif;
+  transform: translateY(0.5px);
 }
 .chat-jump-fade-enter-active, .chat-jump-fade-leave-active { transition: opacity 0.2s ease, transform 0.2s ease; }
 .chat-jump-fade-enter-from, .chat-jump-fade-leave-to { opacity: 0; transform: translateY(6px); }
