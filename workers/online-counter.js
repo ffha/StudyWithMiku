@@ -1,5 +1,4 @@
-const DEFAULT_ROOM_ID = 'global'
-const MAX_ROOM_ID_LENGTH = 64
+const CHAT_ROOM_ID = 'global'
 const MAX_USERNAME_LENGTH = 40
 const MAX_MESSAGE_LENGTH = 500
 const MAX_LOCATION_LENGTH = 20
@@ -32,7 +31,6 @@ const sanitizeLocation = (value) => {
 }
 
 const getDefaultSessionMeta = () => ({
-  roomId: DEFAULT_ROOM_ID,
   userId: '',
   username: '',
   authenticated: false,
@@ -40,17 +38,12 @@ const getDefaultSessionMeta = () => ({
   lastHistoryLoadAt: 0,
 })
 
-const normalizeRoomId = (value) => {
-  const raw = String(value || DEFAULT_ROOM_ID).trim().toLowerCase()
-  const normalized = raw
-    .replace(/[^a-z0-9_-]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, MAX_ROOM_ID_LENGTH)
-
-  return normalized || DEFAULT_ROOM_ID
-}
-
-const getRoomIdFromUrl = (url) => normalizeRoomId(url.searchParams.get('roomId') || url.searchParams.get('room'))
+const getAdminUserIds = (env) => new Set(
+  String(env?.ADMIN_USER_IDS || '')
+    .split(',')
+    .map(id => id.trim())
+    .filter(Boolean)
+)
 
 const sanitizeUsername = (value) => String(value || '').trim().slice(0, MAX_USERNAME_LENGTH)
 
@@ -180,10 +173,8 @@ const getCorsHeaders = (origin, env) => {
   }
 }
 
-const getRoomStub = (request, env) => {
-  const url = new URL(request.url)
-  const roomId = getRoomIdFromUrl(url)
-  const id = env.ONLINE_COUNTER.idFromName(roomId)
+const getCounterStub = (env) => {
+  const id = env.ONLINE_COUNTER.idFromName(CHAT_ROOM_ID)
   return env.ONLINE_COUNTER.get(id)
 }
 
@@ -222,7 +213,6 @@ export class OnlineCounter {
     ws.serializeAttachment({
       ...current,
       ...meta,
-      roomId: normalizeRoomId(meta.roomId ?? current.roomId),
       userId: String(meta.userId ?? current.userId ?? '').slice(0, 128),
       username: sanitizeUsername(meta.username ?? current.username),
       authenticated: Boolean(meta.authenticated ?? current.authenticated),
@@ -233,10 +223,9 @@ export class OnlineCounter {
 
   async fetch(request) {
     const url = new URL(request.url)
-    const roomId = getRoomIdFromUrl(url)
 
     if (url.pathname === '/count') {
-      return jsonResponse(this.getPresence(roomId))
+      return jsonResponse(this.getPresence())
     }
 
     if (url.pathname === '/history') {
@@ -245,10 +234,9 @@ export class OnlineCounter {
         parsePositiveInt(url.searchParams.get('limit'), HISTORY_PAGE_SIZE),
         HISTORY_PAGE_LIMIT,
       )
-      const { messages, hasMore } = await this.getMessagesPage(roomId, { before, limit })
+      const { messages, hasMore } = await this.getMessagesPage({ before, limit })
       return jsonResponse({
         type: 'history',
-        roomId,
         messages,
         hasMore,
       })
@@ -265,20 +253,18 @@ export class OnlineCounter {
 
     this.state.acceptWebSocket(server)
     this.setSessionMeta(server, {
-      roomId,
       userId: auth?.userId || '',
       username: auth?.username || sanitizeUsername(url.searchParams.get('username')),
       authenticated: Boolean(auth),
     })
 
-    const initial = await this.getMessagesPage(roomId, { before: null, limit: HISTORY_PAGE_SIZE })
+    const initial = await this.getMessagesPage({ before: null, limit: HISTORY_PAGE_SIZE })
     this.sendJson(server, {
       type: 'history',
-      roomId,
       messages: initial.messages,
       hasMore: initial.hasMore,
     })
-    this.broadcastPresence(roomId)
+    this.broadcastPresence()
 
     return new Response(null, {
       status: 101,
@@ -304,7 +290,7 @@ export class OnlineCounter {
         const meta = this.getSessionMeta(ws)
         if (!meta.authenticated) {
           this.setSessionMeta(ws, { username: data.username || '' })
-          this.broadcastPresence(meta.roomId)
+          this.broadcastPresence()
         }
         return
       }
@@ -324,13 +310,11 @@ export class OnlineCounter {
   }
 
   async webSocketClose(ws) {
-    const meta = this.getSessionMeta(ws)
-    this.broadcastPresence(meta.roomId)
+    this.broadcastPresence()
   }
 
   async webSocketError(ws) {
-    const meta = this.getSessionMeta(ws)
-    this.broadcastPresence(meta.roomId)
+    this.broadcastPresence()
   }
 
   async handleAuth(ws, token) {
@@ -340,7 +324,6 @@ export class OnlineCounter {
       return
     }
 
-    const meta = this.getSessionMeta(ws)
     this.setSessionMeta(ws, {
       userId: auth.userId,
       username: auth.username,
@@ -352,7 +335,7 @@ export class OnlineCounter {
       userId: auth.userId,
       username: auth.username,
     })
-    this.broadcastPresence(meta.roomId)
+    this.broadcastPresence()
   }
 
   async handleLoadHistory(ws, data) {
@@ -368,10 +351,9 @@ export class OnlineCounter {
 
     this.setSessionMeta(ws, { lastHistoryLoadAt: now })
 
-    const { messages, hasMore } = await this.getMessagesPage(meta.roomId, { before, limit })
+    const { messages, hasMore } = await this.getMessagesPage({ before, limit })
     this.sendJson(ws, {
       type: 'history_chunk',
-      roomId: meta.roomId,
       before,
       messages,
       hasMore,
@@ -407,7 +389,7 @@ export class OnlineCounter {
     const location = sanitizeLocation(data.location)
     const chatMessage = {
       id: crypto.randomUUID(),
-      roomId: meta.roomId,
+      roomId: CHAT_ROOM_ID,
       userId: meta.authenticated ? meta.userId : '',
       username,
       content,
@@ -420,44 +402,38 @@ export class OnlineCounter {
       lastMessageAt: now,
     })
     await this.saveMessage(chatMessage, now)
-    this.broadcastToRoom(meta.roomId, {
+    this.broadcast({
       type: 'chat',
       message: chatMessage,
     })
   }
 
-  getPresence(roomId) {
-    const sessions = this.state.getWebSockets().filter(session => {
-      const meta = this.getSessionMeta(session)
-      return meta.roomId === roomId
-    })
+  getPresence() {
+    const sessions = this.state.getWebSockets()
+    const adminIds = getAdminUserIds(this.env)
     const adminOnline = sessions.some(session => {
       const meta = this.getSessionMeta(session)
-      return meta.username === 'shshouse'
+      return meta.authenticated && adminIds.has(meta.userId)
     })
 
     return {
       type: 'count',
-      roomId,
       count: sessions.length,
       adminOnline,
     }
   }
 
-  broadcastPresence(roomId) {
-    this.broadcastToRoom(roomId, this.getPresence(roomId))
+  broadcastPresence() {
+    this.broadcast(this.getPresence())
   }
 
-  broadcastToRoom(roomId, payload) {
+  broadcast(payload) {
     const message = JSON.stringify(payload)
     const sessions = this.state.getWebSockets()
 
     for (const session of sessions) {
       try {
-        const meta = this.getSessionMeta(session)
-        if (meta.roomId === roomId) {
-          session.send(message)
-        }
+        session.send(message)
       } catch {
       }
     }
@@ -478,7 +454,7 @@ export class OnlineCounter {
     })
   }
 
-  async getMessagesPage(roomId, { before = null, limit = HISTORY_PAGE_SIZE } = {}) {
+  async getMessagesPage({ before = null, limit = HISTORY_PAGE_SIZE } = {}) {
     if (!this.env.CHAT_DB) return { messages: [], hasMore: false }
 
     const safeLimit = Math.min(Math.max(1, Math.floor(limit) || HISTORY_PAGE_SIZE), HISTORY_PAGE_LIMIT)
@@ -488,22 +464,22 @@ export class OnlineCounter {
       const stmt = before
         ? this.env.CHAT_DB
             .prepare(`
-              SELECT id, room_id, user_id, username, content, created_at, location
+              SELECT id, user_id, username, content, created_at, location
               FROM chat_messages
               WHERE room_id = ? AND created_at < ?
               ORDER BY created_at DESC
               LIMIT ?
             `)
-            .bind(roomId, before, fetchLimit)
+            .bind(CHAT_ROOM_ID, before, fetchLimit)
         : this.env.CHAT_DB
             .prepare(`
-              SELECT id, room_id, user_id, username, content, created_at, location
+              SELECT id, user_id, username, content, created_at, location
               FROM chat_messages
               WHERE room_id = ?
               ORDER BY created_at DESC
               LIMIT ?
             `)
-            .bind(roomId, fetchLimit)
+            .bind(CHAT_ROOM_ID, fetchLimit)
 
       const { results = [] } = await stmt.all()
       const hasMore = results.length > safeLimit
@@ -512,7 +488,6 @@ export class OnlineCounter {
       return {
         messages: trimmed.reverse().map(row => ({
           id: String(row.id),
-          roomId: String(row.room_id),
           userId: String(row.user_id || ''),
           username: String(row.username || ''),
           content: String(row.content || ''),
@@ -538,13 +513,13 @@ export class OnlineCounter {
             VALUES (?, ?, ?, ?)
             ON CONFLICT(id) DO UPDATE SET updated_at = excluded.updated_at
           `)
-          .bind(message.roomId, message.roomId, createdAt, createdAt),
+          .bind(CHAT_ROOM_ID, CHAT_ROOM_ID, createdAt, createdAt),
         this.env.CHAT_DB
           .prepare(`
             INSERT INTO chat_messages (id, room_id, user_id, username, content, created_at, location)
             VALUES (?, ?, ?, ?, ?, ?, ?)
           `)
-          .bind(message.id, message.roomId, message.userId, message.username, message.content, createdAt, message.location || ''),
+          .bind(message.id, CHAT_ROOM_ID, message.userId, message.username, message.content, createdAt, message.location || ''),
       ])
     } catch (err) {
       console.error('D1 save error:', err)
@@ -583,7 +558,7 @@ export default {
         return new Response('Expected WebSocket', { status: 426 })
       }
 
-      return getRoomStub(request, env).fetch(request)
+      return getCounterStub(env).fetch(request)
     }
 
     if (url.pathname === '/count' || url.pathname === '/history') {
@@ -591,7 +566,7 @@ export default {
         return new Response('Forbidden', { status: 403 })
       }
 
-      const response = await getRoomStub(request, env).fetch(request)
+      const response = await getCounterStub(env).fetch(request)
       return withCors(response, origin, env)
     }
 
