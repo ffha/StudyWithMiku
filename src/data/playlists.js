@@ -1,10 +1,10 @@
 export const recommendPlaylists = [
   {
-    name: '站长神秘歌单+8首神秘音乐',
+    name: '站长神秘歌单',
     desc: '♦',
     platform: 'netease',
     playlistId: '8894040639',
-    tags: ['神秘','有Miku','by 酸']
+    tags: ['神秘','有Miku','彩蛋','by 酸']
   },
   {
     name: '【学习向】Galgame纯音乐',

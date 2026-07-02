@@ -50,6 +50,13 @@ export const localSongsData = {
       lrc: ''
     },
     {
+      name: 'タイトル (title)',
+      artist: 'Alice In Cradle',
+      url: '/SpecialMusic/タイトル (title).mp3',
+      cover: '/SpecialMusic/タイトル (title).cover.jpg',
+      lrc: ''
+    },
+    {
       name: '药',
       artist: "Snail's House",
       url: '/SpecialMusic/medicine - Snail House.mp3',
