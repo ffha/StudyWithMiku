@@ -943,7 +943,9 @@ const playNotificationSound = () => {
     } catch (e) {}
     return
   }
-  duckMusicForNotification(3000)
+  if (!pauseMusicDuringBreak.value) {
+    duckMusicForNotification(3000)
+  }
   setTimeout(() => {
     try {
       if (preloadedAudio) {

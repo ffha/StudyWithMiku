@@ -1,4 +1,5 @@
 import { ref } from 'vue'
+import { cancelDuck } from '../utils/eventBus.js'
 
 const CROSSFADE_DURATION = 6
 const PRELOAD_LEAD_TIME = 20
@@ -78,6 +79,7 @@ export const useCrossfade = () => {
       crossfadeAnimationId = null
     }
     clearCrossfadeEndFallback()
+    cancelDuck()
     destroyCrossfadeAudio()
     destroyHandoffAudio()
     destroyPreloadedAudio()
@@ -340,6 +342,7 @@ export const useCrossfade = () => {
   const fadeMusicOut = (ap, durationInSec = 2, options = {}) => {
     if (!ap || ap.audio.paused) return
     if (isCrossfading || handoffAudio) cleanup(ap)
+    cancelDuck()
     if (fadeAnimationId) { cancelAnimationFrame(fadeAnimationId); fadeAnimationId = null }
     const origVol = ap.audio.volume
     ap._fadeLastVolume = origVol
