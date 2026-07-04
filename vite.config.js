@@ -2,23 +2,10 @@ import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import { VitePWA } from 'vite-plugin-pwa'
 
-const analyticsPlugin = () => {
-  return {
-    name: 'analytics-injector',
-    transformIndexHtml: (html) => {
-      const analyticsId = process.env.VITE_ANALYTICS_ID
-      const analyticsUrl = process.env.VITE_ANALYTICS_URL
-      if (!analyticsId || !analyticsUrl) return html
-      const scriptTag = `<script defer src="${analyticsUrl}" data-website-id="${analyticsId}"></script>`
-      return html.replace('</head>', `${scriptTag}</head>`)
-    }
-  }
-}
 
 export default defineConfig({
   plugins: [
     vue(),
-    analyticsPlugin(),
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'favicon.svg', 'apple-touch-icon.png', 'robots.txt', '*.mp3', '*.mp4'],
